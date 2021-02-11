@@ -1,0 +1,12 @@
+# Development
+.idea
+.vscode
+.DS_Store
+
+# Python
+__pycache__/
+build/
+dist/
+*.egg-info/
+venv/
+*.py[cod]

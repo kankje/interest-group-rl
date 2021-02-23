@@ -1,14 +1,53 @@
 import gym
+import torch
+from torch import optim
+from config import config
+from itertools import count
+from memory import Memory
+from model import load_model, save_model
 
-env = gym.make("CartPole-v1")
-observation = env.reset()
 
-for _ in range(1000):
-    env.render()
-    action = env.action_space.sample()
-    observation, reward, done, info = env.step(action)
+def run_training():
+    env = gym.make(config.env)
 
-    if done:
+    env.seed(config.seed)
+    torch.manual_seed(config.seed)
+
+    model = load_model(env)
+    model_optimizer = optim.Adam(model.parameters(), lr=config.lr)
+    memory = Memory()
+
+    for episode_number in count():
         observation = env.reset()
 
-env.close()
+        for _ in range(config.max_timestep):
+            action = env.action_space.sample()
+            observation, reward, done, info = env.step(action)
+
+            if done:
+                break
+
+        save_model(model, episode_number)
+        memory.clear()
+
+
+def run_eval():
+    env = gym.make(config.env)
+
+    model = load_model(env, is_eval=True)
+    observation = env.reset()
+
+    while True:
+        env.render()
+        action = env.action_space.sample()
+        observation, reward, done, info = env.step(action)
+
+        if done:
+            observation = env.reset()
+
+
+if __name__ == '__main__':
+    if config.eval:
+        run_eval()
+    else:
+        run_training()

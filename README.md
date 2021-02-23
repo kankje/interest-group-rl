@@ -15,3 +15,8 @@
     - If you're on MacOS: `pip install -r requirements/macos.txt`
     - If you have a CUDA compatible GPU: `pip install -r requirements/cuda.txt`
     - If not: `pip install -r requirements/cpu.txt`
+
+## Training and evaluating the network
+
+- Train the network with `python train.py`
+- Evaluate the trained network with `python train.py --eval`

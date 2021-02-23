@@ -1,10 +1,38 @@
 import gym
 import torch
 from torch import optim
-from config import config
+from config import config, device, eps
 from itertools import count
-from memory import Memory
+from memory import Memory, Transition
 from model import load_model, save_model
+
+
+def normalize(tensor):
+    return (tensor - tensor.mean()) / (tensor.std() + eps)
+
+
+def discount_rewards(rewards, masks):
+    rewards = torch.Tensor(rewards).to(device)
+
+    discounted_rewards = torch.zeros_like(rewards).to(device)
+    running_reward = 0
+
+    for t in reversed(range(len(rewards))):
+        running_reward = rewards[t] + config.gamma * running_reward * masks[t]
+        discounted_rewards[t] = running_reward
+
+    return normalize(discounted_rewards)
+
+
+def calculate_loss(memory):
+    action_log_probs, rewards, masks = Transition(*zip(*memory.transitions))
+
+    discounted_rewards = discount_rewards(rewards, masks)
+    action_log_probs = torch.stack(action_log_probs).to(device)
+
+    loss = (-action_log_probs * discounted_rewards).mean()
+
+    return loss, loss.detach().cpu().numpy()
 
 
 def run_training():
@@ -28,6 +56,7 @@ def run_training():
             if done:
                 break
 
+        loss, graphable_loss = calculate_loss(memory)
         save_model(model, episode_number)
         memory.clear()
 

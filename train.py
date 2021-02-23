@@ -21,8 +21,9 @@ def run_training():
         observation = env.reset()
 
         for _ in range(config.max_timestep):
-            action = env.action_space.sample()
+            action, action_log_prob = model.select_action(observation)
             observation, reward, done, info = env.step(action)
+            memory.push(action_log_prob, reward, 0 if done else 1)
 
             if done:
                 break
@@ -39,7 +40,7 @@ def run_eval():
 
     while True:
         env.render()
-        action = env.action_space.sample()
+        action, action_log_prob = model.select_action(observation)
         observation, reward, done, info = env.step(action)
 
         if done:

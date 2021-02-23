@@ -2,12 +2,15 @@ from os import path
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.distributions import Categorical
 from config import config, device
 
 
 class Model(nn.Module):
-    def __init__(self, num_inputs, num_outputs):
+    def __init__(self, num_inputs, num_outputs, is_eval=False):
         super().__init__()
+
+        self.is_eval = is_eval
 
         self.fc1 = nn.Linear(num_inputs, 128)
         self.fc2 = nn.Linear(128, num_outputs)
@@ -18,9 +21,24 @@ class Model(nn.Module):
 
         return policy
 
+    def select_action(self, observation):
+        observation = torch.from_numpy(observation).float().to(device)
+        action_probs = self(observation)
+        categorical_distribution = Categorical(action_probs)
+
+        if self.is_eval:
+            selected_action = torch.argmax(categorical_distribution.probs)
+        else:
+            selected_action = categorical_distribution.sample()
+
+        return (
+            selected_action.item(),
+            categorical_distribution.log_prob(selected_action),
+        )
+
 
 def load_model(env, is_eval=False):
-    model = Model(num_inputs=len(env.observation_space.high), num_outputs=env.action_space.n)
+    model = Model(num_inputs=len(env.observation_space.high), num_outputs=env.action_space.n, is_eval=is_eval)
     model.to(device)
 
     if path.exists(config.filename):

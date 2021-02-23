@@ -35,6 +35,12 @@ def calculate_loss(memory):
     return loss, loss.detach().cpu().numpy()
 
 
+def train_model(model_optimizer, loss):
+    model_optimizer.zero_grad()
+    loss.backward()
+    model_optimizer.step()
+
+
 def run_training():
     env = gym.make(config.env)
 
@@ -57,6 +63,7 @@ def run_training():
                 break
 
         loss, graphable_loss = calculate_loss(memory)
+        train_model(model_optimizer, loss)
         save_model(model, episode_number)
         memory.clear()
 

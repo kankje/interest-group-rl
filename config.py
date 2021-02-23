@@ -12,6 +12,7 @@ parser.add_argument('--lr', type=float, default=0.001)
 parser.add_argument('--max-timestep', type=int, default=1000)
 parser.add_argument('--filename', default='models/cartpole.pth')
 parser.add_argument('--history-filename', default='models/cartpole.{}.pth')
+parser.add_argument('--graph-filename', default='graphs/cartpole.png')
 
 config = parser.parse_args()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

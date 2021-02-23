@@ -1,10 +1,11 @@
+from itertools import count
 import gym
 import torch
 from torch import optim
 from config import config, device, eps
-from itertools import count
 from memory import Memory, Transition
 from model import load_model, save_model
+import plot
 
 
 def normalize(tensor):
@@ -53,11 +54,16 @@ def run_training():
 
     for episode_number in count():
         observation = env.reset()
+        episode_rewards = []
+        episode_duration = 0
 
-        for _ in range(config.max_timestep):
+        for t in range(config.max_timestep):
             action, action_log_prob = model.select_action(observation)
             observation, reward, done, info = env.step(action)
             memory.push(action_log_prob, reward, 0 if done else 1)
+
+            episode_rewards.append(reward)
+            episode_duration = t
 
             if done:
                 break
@@ -66,6 +72,9 @@ def run_training():
         train_model(model_optimizer, loss)
         save_model(model, episode_number)
         memory.clear()
+
+        plot.add_point(sum(episode_rewards), episode_duration, graphable_loss)
+        plot.render()
 
 
 def run_eval():

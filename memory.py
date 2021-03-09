@@ -1,6 +1,6 @@
 from collections import namedtuple
 
-Transition = namedtuple('Transition', ('action_log_prob', 'reward', 'mask'))
+Transition = namedtuple('Transition', ('action_log_prob', 'state_value', 'reward', 'mask'))
 
 
 class Memory:

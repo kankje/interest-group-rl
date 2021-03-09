@@ -12,18 +12,20 @@ class Model(nn.Module):
 
         self.is_eval = is_eval
 
-        self.fc1 = nn.Linear(num_inputs, 128)
-        self.fc2 = nn.Linear(128, num_outputs)
+        self.shared_fc1 = nn.Linear(num_inputs, 128)
+        self.actor_fc1 = nn.Linear(128, num_outputs)
+        self.critic_fc1 = nn.Linear(128, 1)
 
     def forward(self, x):
-        x = F.relu(self.fc1(x))
-        policy = F.softmax(self.fc2(x), dim=-1)
+        x = F.relu(self.shared_fc1(x))
+        policy = F.softmax(self.actor_fc1(x), dim=-1)
+        value = self.critic_fc1(x)
 
-        return policy
+        return policy, value
 
     def select_action(self, observation):
         observation = torch.from_numpy(observation).float().to(device)
-        action_probs = self(observation)
+        action_probs, value = self(observation)
         categorical_distribution = Categorical(action_probs)
 
         if self.is_eval:
@@ -34,6 +36,7 @@ class Model(nn.Module):
         return (
             selected_action.item(),
             categorical_distribution.log_prob(selected_action),
+            value.squeeze()
         )
 
 
@@ -53,5 +56,5 @@ def load_model(env, is_eval=False):
 def save_model(model, training_count):
     torch.save(model.state_dict(), config.filename)
 
-    if training_count > 0 and training_count % 50 == 0:
+    if training_count > 0 and training_count % 500 == 0:
         torch.save(model.state_dict(), config.history_filename.format(training_count))

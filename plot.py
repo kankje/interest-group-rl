@@ -6,7 +6,8 @@ from config import config
 fig, axs = plt.subplots(nrows=2, ncols=2, num=1)
 axs[0][0].set_title('Reward')
 axs[0][1].set_title('Duration')
-axs[1][0].set_title('Loss')
+axs[1][0].set_title('Actor loss')
+axs[1][1].set_title('Critic loss')
 
 lines = []
 rolling_lines = []

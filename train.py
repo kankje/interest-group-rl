@@ -2,6 +2,7 @@ from itertools import count
 import gym
 import torch
 from torch import optim
+import torch.nn.functional as F
 import numpy as np
 from config import config, device, eps
 from memory import Memory, Transition
@@ -28,14 +29,20 @@ def discount_rewards(rewards, masks):
 
 
 def calculate_loss(memory):
-    action_log_probs, rewards, masks = Transition(*zip(*memory.transitions))
+    action_log_probs, values, rewards, masks = Transition(*zip(*memory.transitions))
 
     discounted_rewards = discount_rewards(rewards, masks)
     action_log_probs = torch.stack(action_log_probs).to(device)
+    values = torch.stack(values).to(device)
 
-    loss = (-action_log_probs * discounted_rewards).mean()
+    actor_loss = (-action_log_probs * (discounted_rewards - values.detach())).mean()
+    critic_loss = F.smooth_l1_loss(values, discounted_rewards, reduction='none').mean()
 
-    return loss, loss.detach().cpu().numpy()
+    return (
+        actor_loss + critic_loss,
+        actor_loss.detach().cpu().numpy(),
+        critic_loss.detach().cpu().numpy()
+    )
 
 
 def train_model(model_optimizer, loss):
@@ -58,6 +65,7 @@ def run_training():
     for training_count in count():
         worker_observations = np.zeros((config.worker_count, len(env.observation_space.high)))
         worker_action_log_probs = torch.zeros((config.worker_count, config.max_timestep))
+        worker_values = torch.zeros((config.worker_count, config.max_timestep))
         worker_rewards = np.zeros((config.worker_count, config.max_timestep))
         worker_dones = np.zeros((config.worker_count, config.max_timestep), dtype=np.int8)
 
@@ -67,7 +75,7 @@ def run_training():
 
         for t in range(config.max_timestep):
             for w, worker in enumerate(workers):
-                action, worker_action_log_probs[w, t] = model.select_action(worker_observations[w])
+                action, worker_action_log_probs[w, t], worker_values[w, t] = model.select_action(worker_observations[w])
                 worker.child.send(('step', action))
 
             for w, worker in enumerate(workers):
@@ -82,6 +90,7 @@ def run_training():
             for t in range(len(worker_rewards[w])):
                 memory.push(
                     worker_action_log_probs[w][t],
+                    worker_values[w][t],
                     worker_rewards[w][t],
                     0 if worker_dones[w][t] else 1
                 )
@@ -91,12 +100,17 @@ def run_training():
                     episode_durations.append(t)
                     episode_start_index = t + 1
 
-        loss, graphable_loss = calculate_loss(memory)
+        loss, graphable_actor_loss, graphable_critic_loss = calculate_loss(memory)
         train_model(model_optimizer, loss)
         save_model(model, training_count)
         memory.clear()
 
-        plot.add_point(np.mean(episode_total_rewards), np.mean(episode_durations), graphable_loss)
+        plot.add_point(
+            np.mean(episode_total_rewards),
+            np.mean(episode_durations),
+            graphable_actor_loss,
+            graphable_critic_loss
+        )
         plot.render()
 
 
@@ -108,7 +122,7 @@ def run_eval():
 
     while True:
         env.render()
-        action, action_log_prob = model.select_action(observation)
+        action, action_log_prob, value = model.select_action(observation)
         observation, reward, done, info = env.step(action)
 
         if done:

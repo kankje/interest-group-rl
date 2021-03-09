@@ -25,19 +25,15 @@ class Model(nn.Module):
 
     def select_action(self, observation):
         observation = torch.from_numpy(observation).float().to(device)
-        action_probs, value = self(observation)
-        categorical_distribution = Categorical(action_probs)
+        policies, value = self(observation)
+        categorical_distribution = Categorical(policies)
 
         if self.is_eval:
             selected_action = torch.argmax(categorical_distribution.probs)
         else:
             selected_action = categorical_distribution.sample()
 
-        return (
-            selected_action.item(),
-            categorical_distribution.log_prob(selected_action),
-            value.squeeze()
-        )
+        return selected_action.item()
 
 
 def load_model(env, is_eval=False):
@@ -56,5 +52,5 @@ def load_model(env, is_eval=False):
 def save_model(model, training_count):
     torch.save(model.state_dict(), config.filename)
 
-    if training_count > 0 and training_count % 500 == 0:
+    if training_count > 0 and training_count % 50 == 0:
         torch.save(model.state_dict(), config.history_filename.format(training_count))

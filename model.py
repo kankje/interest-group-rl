@@ -53,5 +53,5 @@ def load_model(env, is_eval=False):
 def save_model(model, training_count):
     torch.save(model.state_dict(), config.filename)
 
-    if training_count > 0 and training_count % 500 == 0:
+    if training_count > 0 and training_count % 50 == 0:
         torch.save(model.state_dict(), config.history_filename.format(training_count))

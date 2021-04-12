@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.distributions import Categorical
 from config import config, device
+import numpy as np
 
 
 class Model(nn.Module):
@@ -37,7 +38,7 @@ class Model(nn.Module):
 
 
 def load_model(env, is_eval=False):
-    model = Model(num_inputs=len(env.observation_space.high), num_outputs=env.action_space.n, is_eval=is_eval)
+    model = Model(num_inputs=9, num_outputs=env.action_space.n, is_eval=is_eval)
     model.to(device)
 
     if path.exists(config.filename):

@@ -148,15 +148,15 @@ def run_training():
 
             for t in range(len(worker_rewards[w])):
                 memory.push(
-                    worker_observations[w][t],
-                    worker_actions[w][t],
-                    worker_rewards[w][t],
-                    0 if worker_dones[w][t] else 1
+                    worker_observations[w, t],
+                    worker_actions[w, t],
+                    worker_rewards[w, t],
+                    0 if worker_dones[w, t] else 1
                 )
 
-                if worker_dones[w][t]:
+                if worker_dones[w, t]:
                     episode_total_rewards.append(np.sum(worker_rewards[w, episode_start_index:t]))
-                    episode_durations.append(t)
+                    episode_durations.append(t - episode_start_index)
                     episode_start_index = t + 1
 
         graphable_actor_loss, graphable_critic_loss, graphable_entropy_loss = train_model(

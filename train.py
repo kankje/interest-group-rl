@@ -1,3 +1,4 @@
+import math
 from itertools import count
 import gym
 import torch
@@ -129,36 +130,36 @@ def run_training():
         dones = np.zeros((config.max_timestep,), dtype=np.int8)
 
         observations[0] = env.reset()
-        opponent_model = load_model(env, True)
+        opponent_model = load_model(
+            env,
+            is_eval=True,
+            training_count=max(0, math.floor(max(0, training_count - 1) / 50) * 50)
+        )
+
+        is_model_x = True
 
         for t in range(config.max_timestep):
-            #print('Before actions', t)
-            #env.render(mode='ansi')
-            #input()
-
             # We make a move
 
-            actions[t] = model.select_action(observations[t])
-            observation, rewards[t], dones[t], info = env.step(int(actions[t]))
-
-            #print('After player action', t, dones[t])
-            #env.render(mode='ansi')
-            #input()
+            actions[t] = model.select_action(observations[t], env.get_legal_actions())
+            observation, rewards[t], dones[t], _ = env.step(int(actions[t]))
 
             if not dones[t]:
                 # If game not done, opponent makes move
-                action = opponent_model.select_action(observations[t])
-                observation, reward, dones[t], info = env.step(int(action))
-
-                #print('After opponent action', t, dones[t])
-                #env.render(mode='ansi')
-                #input()
+                action = opponent_model.select_action(observation, env.get_legal_actions())
+                observation, reward, dones[t], _ = env.step(int(action))
 
                 if dones[t]:
                     rewards[t] = -reward
 
             if dones[t]:
                 observation = env.reset()
+                is_model_x = not is_model_x
+
+                if not is_model_x:
+                    # If we're playing as O, opponent makes first move
+                    action = opponent_model.select_action(observation, env.get_legal_actions())
+                    observation, _, _, _ = env.step(int(action))
 
             if t + 1 < config.max_timestep:
                 observations[t + 1] = observation
@@ -177,8 +178,8 @@ def run_training():
             )
 
             if dones[t]:
-                episode_total_rewards.append(np.sum(rewards[episode_start_index:t]))
-                episode_durations.append(t - episode_start_index)
+                episode_total_rewards.append(np.sum(rewards[episode_start_index:t + 1]))
+                episode_durations.append(t - episode_start_index + 1)
                 episode_start_index = t + 1
 
         graphable_actor_loss, graphable_critic_loss, graphable_entropy_loss = train_model(
@@ -202,17 +203,39 @@ def run_training():
 
 def run_eval():
     env = gym.make(config.env)
-
     model = load_model(env, is_eval=True)
     observation = env.reset()
+    is_model_x = True
+
+    def get_user_action():
+        x, y = [int(value.strip()) for value in input('\nYour move: ').split(',')]
+        return (x - 1) + (y - 1) * 3
 
     while True:
+        action = model.select_action(observation, env.get_legal_actions())
+        observation, reward, done, _ = env.step(action)
+
+        print('\nAfter opponent move')
         env.render(mode='ansi')
-        action = model.select_action(observation)
-        observation, reward, done, info = env.step(action)
+
+        if reward == 100:
+            print('\n--- YOU LOSE ---\n')
+
+        if not done:
+            observation, reward, done, _ = env.step(get_user_action())
+
+            if reward == 100:
+                print('\n--- YOU WIN ---\n')
 
         if done:
+            if reward == 0:
+                print('\n--- TIE ---\n')
+
             observation = env.reset()
+            is_model_x = not is_model_x
+
+            if not is_model_x:
+                observation, _, _, _ = env.step(get_user_action())
 
 
 if __name__ == '__main__':

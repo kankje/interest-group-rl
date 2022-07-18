@@ -33,23 +33,23 @@ class TicTacToeEnv(gym.Env):
 
     # Returns (observation, reward, is_done, info)
     def _step(self, action):
-        x, y = np.unravel_index(action, self.observation_space.high.shape)
+        x, y = np.unravel_index(action, self.observation_space.high.shape, order='F')
 
         if not self.is_legal_action(x, y):
-            return np.array(self.state).flatten(), -100, True, {}
+            raise ValueError('Invalid action {},{} on {}'.format(x, y, self.state))
 
         self.take_action(x, y)
 
         if self.is_tie():
-            return np.array(self.state).flatten(), 0, True, {}
+            return self.get_observation(), 0, True, {}
 
         winner = self.get_winner()
         if winner is None:
             self.player_in_turn = 1 if self.player_in_turn == -1 else -1
-            return np.array(self.state).flatten(), 10, False, {}
+            return self.get_observation(), 10, False, {}
 
         reward = 100 if winner == self.player_in_turn else -100
-        return np.array(self.state).flatten(), reward, True, {}
+        return self.get_observation(), reward, True, {}
 
     def _reset(self):
         self.state = [
@@ -60,43 +60,43 @@ class TicTacToeEnv(gym.Env):
         # 1 = ❌, -1 = ⭕️
         self.player_in_turn = 1
 
-        return np.array(self.state).flatten()
+        return self.get_observation()
 
     def _render(self, mode='human', close=False):
-        if mode == 'rgb_array':
-            return
-        elif mode == 'human':
-            return
-        else:
-            def map_state(n):
-                if n == 0:
-                    return '-'
-                elif n == 1:
-                    return 'x'
-                elif n == -1:
-                    return 'o'
-
-            def map_row(row):
-                new_row = list(map(map_state, row))
-                return f'{new_row[0]} {new_row[1]} {new_row[2]}'
-
-            res = map(map_row, self.state)
-            list_res = [i for i in list(res)]
-
-
-            print(f'{list_res[0]}\n{list_res[1]}\n{list_res[2]}')
+        if mode == 'rgb_array' or mode == 'human':
             return
 
-        raise NotImplementedError
+        def map_state(n):
+            if n == 0:
+                return '-'
+            elif n == 1:
+                return 'x'
+            elif n == -1:
+                return 'o'
+
+        def map_row(row):
+            new_row = list(map(map_state, row))
+            return f'{new_row[0]} {new_row[1]} {new_row[2]}'
+
+        res = map(map_row, self.state)
+        list_res = [i for i in list(res)]
+
+        print(f'{list_res[0]}\n{list_res[1]}\n{list_res[2]}')
 
     def _seed(self, seed=None):
         return []
 
     def is_legal_action(self, x, y):
-        return self.state[x][y] == 0
+        return self.state[y][x] == 0
+
+    def get_legal_actions(self):
+        return 1 - np.abs(np.array(self.state).flatten())
 
     def take_action(self, x, y):
-        self.state[x][y] = self.player_in_turn
+        self.state[y][x] = self.player_in_turn
+
+    def get_observation(self):
+        return np.array(self.state).flatten() * self.player_in_turn
 
     def is_tie(self):
         return np.count_nonzero(self.state) == 9 and self.get_winner() is None

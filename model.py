@@ -24,10 +24,15 @@ class Model(nn.Module):
 
         return policy, value
 
-    def select_action(self, observation):
+    def select_action(self, observation, legal_actions):
         observation = torch.from_numpy(observation).float().to(device)
         policies, value = self(observation)
-        categorical_distribution = Categorical(policies)
+        masked_policies = policies * torch.from_numpy(legal_actions).to(device)
+
+        if torch.isclose(torch.sum(masked_policies), torch.tensor(0.)):
+            return np.random.choice(np.where(legal_actions == 1)[0].astype(int))
+
+        categorical_distribution = Categorical(masked_policies)
 
         if self.is_eval:
             selected_action = torch.argmax(categorical_distribution.probs)
@@ -37,12 +42,13 @@ class Model(nn.Module):
         return selected_action.item()
 
 
-def load_model(env, is_eval=False):
+def load_model(env, is_eval=False, training_count=None):
     model = Model(num_inputs=9, num_outputs=env.action_space.n, is_eval=is_eval)
     model.to(device)
 
-    if path.exists(config.filename):
-        model.load_state_dict(torch.load(config.filename))
+    filename = config.filename if training_count is None else config.history_filename.format(training_count)
+    if path.exists(filename):
+        model.load_state_dict(torch.load(filename))
 
     if is_eval:
         model.eval()
